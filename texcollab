@@ -170,6 +170,8 @@ function init(){
     echo "*.blg" >> .gitignore
     echo "*.log" >> .gitignore
     echo "*.tmp" >> .gitignore
+    echo "*.synctex.gz" >> .gitignore
+    echo "*.DS_Store" >> .gitignore
     echo "*~" >> .gitignore
 
     # Now we can add, commit, push to master
@@ -354,7 +356,11 @@ function extras(){
         errors+=("Error <extras>: valid commands to <extras> include 'push' and 'pull', try -h/--help")
         return 1
     else
-        local base_rsync_options="-vrzP -e ssh --delete --checksum --links --safe-links"
+# jochen: https://www.linuxquestions.org/questions/programming-9/rsync-cannot-delete-non-empty-directory-4175597350/
+# it may be necessary to add --delete-excluded after --delete to avoid
+# cannot delete non-empty directory: errors.
+# However, that causes all backup files to be deleted ... 
+        local base_rsync_options="-vrzP -e ssh --delete --backup --suffix=.bak --checksum --links --safe-links"
         if [ ${array[0]} == "push" ]; then
             # First push will need this command, "/extras" just gets us to the correct `else if` statement in remote_texcollab_helper
             ssh $TEXCOLLAB_REMOTE_DOMAIN "$(typeset -f); remote_texcollab_helper $TEXCOLLAB_REMOTE_DIR.git/extras" 2> /dev/null
@@ -468,6 +474,9 @@ function compare(){
             git show ${array[1]}:${array[0]} > ${array[1]}-$file_name.tmp
             $TEXCOLLAB_MERGE_TOOL ${array[0]} ${array[1]}-$file_name.tmp
             rm ${array[1]}-$file_name.tmp
+            echo "git show ${array[1]}:${array[0]} > ${array[1]}-$file_name.tmp"
+            #echo "$TEXCOLLAB_MERGE_TOOL ${array[0]} ${array[1]}-$file_name.tmp"
+            #echo "rm ${array[1]}-$file_name.tmp"
         elif [ $current_branch == $TEXCOLLAB_STUDENT ]; then
             git show ${array[1]}:${array[0]} > ${array[1]}-$file_name.tmp
             $TEXCOLLAB_MERGE_TOOL ${array[0]} ${array[1]}-$file_name.tmp
