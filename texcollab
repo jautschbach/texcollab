@@ -160,7 +160,7 @@ function init(){
     echo "share/" >> .gitignore
     echo "data/" >> .gitignore
     echo "esub/" >> .gitignore
-    echo "esub.zip" >> .gitignore
+    echo "*.zip" >> .gitignore
     echo "*.dvi" >> .gitignore
     echo "*.svg" >> .gitignore
     echo "*.pdf" >> .gitignore
