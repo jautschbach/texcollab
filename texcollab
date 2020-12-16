@@ -360,7 +360,9 @@ function extras(){
 # it may be necessary to add --delete-excluded after --delete to avoid
 # cannot delete non-empty directory: errors.
 # However, that causes all backup files to be deleted ... 
-        local base_rsync_options="-vrzP -e ssh --delete --backup --suffix=.bak --checksum --links --safe-links"
+# 161220: I previously added the backup option --backup --suffix=.bak
+# but it created a mess of .bak files so I removed it again
+        local base_rsync_options="-vrzP -e ssh --delete --checksum --links --safe-links"
         if [ ${array[0]} == "push" ]; then
             # First push will need this command, "/extras" just gets us to the correct `else if` statement in remote_texcollab_helper
             ssh $TEXCOLLAB_REMOTE_DOMAIN "$(typeset -f); remote_texcollab_helper $TEXCOLLAB_REMOTE_DIR.git/extras" 2> /dev/null
