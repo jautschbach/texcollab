@@ -374,11 +374,11 @@ function extras(){
             if [ ${#actual_extras[@]} -ne 0 ]; then
                 # Some undocumented features, will get skipped if using standard version
                 if [ -n "$TEXCOLLAB_REMOTE_RSYNC" -a -n "$TEXCOLLAB_GROUP" ]; then
-                    rsync $base_rsync_options --rsync-path=$TEXCOLLAB_REMOTE_RSYNC --group --chown=:$TEXCOLLAB_GROUP $rsync_files_remote_domain
+                    rsync $base_rsync_options --rsync-path=$TEXCOLLAB_REMOTE_RSYNC --group --chown=:$TEXCOLLAB_GROUP --perms --chmod=go+r $rsync_files_remote_domain
                 elif [ -n "$TEXCOLLAB_REMOTE_RSYNC" ]; then
                     rsync $base_rsync_options --rsync-path=$TEXCOLLAB_REMOTE_RSYNC $rsync_files_remote_domain
                 elif [ -n "$TEXCOLLAB_GROUP" ]; then
-                    rsync $base_rsync_options --group --chown=:$TEXCOLLAB_GROUP $rsync_files_remote_domain
+                    rsync $base_rsync_options --group --chown=:$TEXCOLLAB_GROUP --perms --chmod=go+r  $rsync_files_remote_domain
                 else
                     rsync $base_rsync_options $rsync_files_remote_domain
                 fi
