@@ -473,16 +473,13 @@ function compare(){
         local file_name=$(echo ${array[0]} | sed 's/\// /' | awk '{print $NF}')
 
         if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "master" ]; then
-            git show ${array[1]}:${array[0]} > ${array[1]}-$file_name.tmp
-            $TEXCOLLAB_MERGE_TOOL ${array[0]} ${array[1]}-$file_name.tmp
-            rm ${array[1]}-$file_name.tmp
-            echo "git show ${array[1]}:${array[0]} > ${array[1]}-$file_name.tmp"
-            #echo "$TEXCOLLAB_MERGE_TOOL ${array[0]} ${array[1]}-$file_name.tmp"
-            #echo "rm ${array[1]}-$file_name.tmp"
+            git show ${array[1]}:${array[0]} > $$-texcollab-compare.tmp
+            $TEXCOLLAB_MERGE_TOOL ${array[0]} $$-texcollab-compare.tmp
+            rm $$-texcollab-compare.tmp
         elif [ $current_branch == $TEXCOLLAB_STUDENT ]; then
-            git show ${array[1]}:${array[0]} > ${array[1]}-$file_name.tmp
-            $TEXCOLLAB_MERGE_TOOL ${array[0]} ${array[1]}-$file_name.tmp
-            rm ${array[1]}-$file_name.tmp
+            git show ${array[1]}:${array[0]} > $$-texcollab-compare.tmp
+            $TEXCOLLAB_MERGE_TOOL ${array[0]} $$-texcollab-compare.tmp
+            rm $$-texcollab-compare.tmp
         else
             errors+=("Error <compare>: You should be working in your branch!")
             return 1
