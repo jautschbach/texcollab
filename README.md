@@ -113,10 +113,10 @@ following types of files in this directory:
   directory, to generate images.
 - `*.plt`: gnuplot files to generate `*.{eps,pdf}`
 - `*.py`: python scripts to generate `*.{eps,pdf}`
-- `*.tex`: panels to combine `*.{eps,pdf}` into other `*.{eps,pdf}` in sibgle-page LaTeX documents, to be included in the main file via `\includegraphics`. Typically, `pdf` figure files generated in `plots/` get symlinked to `figures/`
+- `*.tex`: panels to combine `*.{eps,pdf}` files or bitmaps `*.{png,jpg}` in `share/` into other `{pdf}` files via single-page LaTeX documents, to be included in the main file via `\includegraphics`. Typically, `pdf` figure files generated in `plots/` get symlinked to `figures/`
 
-I like to use Inkscape to combine images, but `*.svg` files are ignored. Put
-the `*.svg` files into `share/` if you want to share them. 
+Some users like to use Inkscape to combine images, but `*.svg` files are ignored by default and should be in 'extras'. Put
+the `*.svg` files into `share/` if you want to include them in the repository. 
 
 # SSH Access and Config
 
