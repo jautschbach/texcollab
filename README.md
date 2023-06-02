@@ -7,11 +7,11 @@ updates and fixes to the code.]
 
 `texcollab` is a shell script that wraps around `git` and `rsync` and is
 primarily intended for collaborative work on complex `LaTeX` documents. The original 
-developer (Barry) referred to this as his 
+developer referred to this as his 
  "Advisor-Student/s Mergeless" model. 
 
 
-`texcollab` is intended to be used in a `bash` shell on a UNIX-type system (Linux, the Linux subsystem
+`texcollab` is intended to be used in a `bash` terminal session on a UNIX-type system (Linux, the Linux subsystem
 in Windows, or the command line interface on a Mac). Prerequisites are `git`,
 `openssh`, `rsync`, and to work on the resulting documents you'll obviously also need
 a working  `LaTeX` installation (we use `texlive`). For the comparison of `tex` files modified by different users, the `meld` tool is highly recommended (http://meldmerge.org/) and assumed to be available on the machine where you run `texcollab`. There is also 'Beyond Compare' (https://www.scootersoftware.com/).  Finally, the people collaborating on a project need to have 
@@ -34,35 +34,35 @@ Also, a research manuscript tends to come with a large set of figures, usually i
 binary format or with embedded figures in a compressed bitmap format, or with accompanying
 Office documents and such. Those files are rarely suitable for version control, and if a set
 of PDF figures, say, gets recreated repeatedly, the `git` revisions tree would quickly 
-grow too big with no apparent benefit. Our group attempted to switch to a `git` workflow previously, but
-found it to be too difficult for beginners. 
+grow very large (preserving each indivdual version of each file) with no apparent benefit to the workflow. 
 
 Therefore, we came up with a workflow in which files are exchanged via a remote repository, accessible
-by all participants in the project, such that some files are under `git` version control whereas
-other types of files (binary files, in particular) are exchanged via the same repository using `rsync`. The `texcollab` script combines everything in a single command-line interface. 
+by all participants in the project, such that some files are under `git` version control while
+other types of files (binary files, in particular) are exchanged via the repository using `rsync`. The `texcollab` script combines everything in a single command-line interface. 
 
 `texcollab` also hides much of the `git` and `rsync` syntax and can therefore be used by someone who
 is unfamiliar with either. However, it is helpful to have a general idea of how version control works, and
 we use the related terms 'commit', 'pull', 'push', 'branch', etc. `texcollab` makes to particular use of the distributed development framework 
-offered by `git`; rather, we use it in a more old-fashioned way that some (looking at you, LT) have
-referred to as 'ugly and stupid'. Finally, `texcollab` is not foolproof, and sometimes it happens
+offered by `git`; rather, we use it in an old-fashioned 'hub and spokes' model that someone (LT) indirectly
+referred to as 'ugly and stupid'. 
+
+`texcollab` is not foolproof, of course, and sometimes it happens
 that someone needs to fix things manually with `git`. 
 
 
 # What is the "Advisor-Student/s Mergeless" model?
 
-As mentioned, `git merge` for LaTeX is not without disadvantages, and our group needed a simple
-workflow for everyone involved with a project. So, the model consists of the
-`master` branch used by the senior author and a branch for each "student". The examples that follow
-use the branches `master` for the advisor and `barrymoo` for the student or postdoc co-author. The student is
-not allowed to commit to `master` and the advisor is not allowed to commit 
+The model consists of the
+`master` branch used by the senior author and a branch for each co-author ('student'). The examples that follow
+use the branches `master` for the advisor and `barrymoo` for a student or postdoc co-author. The student is
+not supposed to commit to `master` and the advisor is not supposed to commit 
 to the student branch. Neither the student nor the advisor will ever use an automated `git` merge. 
 
-Instead, `texcollab` makes a distinction between version-controlled files (primarily `tex` files) vs. other data that should not be under version control. `texcollab` provides commands to list version-controlled files that are different in the two branches, and an option to compare those files with the `meld` tool (alternatives to `meld` might exist, but we haven't tried them) and merge the differences in `meld`. This way, there is always someone looking at the pieces that will get merged, and the aforementioned 'incomprehensible mess' is typically avoided. `meld` also has an option to merge all changes from a file in one branch to the same file
+`texcollab` makes a distinction between version-controlled files (primarily `tex` files) vs. other data that should not be under version control. `texcollab` provides commands to list version-controlled files that are different in the two branches, and an option to compare those files with the `meld` tool (or similar software) and merge the differences in `meld`. This way, there is always someone looking at the pieces that will get merged, and the aforementioned 'incomprehensible mess' is typically avoided. `meld` also has an option to merge all changes from a file in one branch to the same file
 in another branch, which is sometimes useful when there are a lot of edits by someone who can be trusted.
 
 An occasional 'manual' intervention with `git` may become necessary if there are many complex updates
-in a repository, often with repeated file name changes in one branch vs. another. In this case, an experienced `git` user may have to work on this. Worst case: re-create a new repository from the
+in a repository, for example, when there are repeated file name changes followed by commits in one branch vs. another. In this case, an experienced `git` user may have to work on this. Worst case: re-create a new repository from the
 files in one of the branches. However, 
 this should not be necessary. 
 
@@ -82,7 +82,7 @@ this should not be necessary.
 └── supporting-information.tex
 ```
 
-Files/Directories which are tracked:
+Files/Directories that are tracked:
 - `citations.bib`: The citations in bibtex format (not necessary, we use an
   internal citation git repository), name can be changed
 - `main.tex`: The main tex files, name can be changed
@@ -91,7 +91,7 @@ Files/Directories which are tracked:
 - `supporting-information.tex`: The supporting information (not necessary), do
   not change name (for `texcollab compile` to work)
 
-Files/Directories which are NOT tracked:
+Files/Directories that are NOT tracked (set via `.gitignore`):
 - `.texcollab`: The texcollab configuration file
 - `data/`: Contains raw output files from programs
 - `esub/`: We use scripts which generate electronic submissions to online
@@ -102,18 +102,18 @@ Files/Directories which are NOT tracked:
 we choose to separate these images from `figures/` but you can choose what's
 best for you.
 - `share/`: Contains binary files generated from specific programs, for example
-  ChemDraw or MarvinSketch
+  ChemDraw or MarvinSketch or an orbital plotting program
 - `spreadsheets/`: Contains spreadsheet files, for example from Excel or
   Gnumeric
 
 Important notes about using `plots/`. Please be very careful with this
-directory! `texcollab status` is your friend.  I expect people to have the
+directory! `texcollab status` is your friend.  We expect people to have the
 following types of files in this directory:
 - `*.dat`: small parsed data files, likely generated from the `data/`
   directory, to generate images.
 - `*.plt`: gnuplot files to generate `*.{eps,pdf}`
 - `*.py`: python scripts to generate `*.{eps,pdf}`
-- `*.tex`: panels to combine `*.{eps,pdf}` into other `*.{eps,pdf}`
+- `*.tex`: panels to combine `*.{eps,pdf}` into other `*.{eps,pdf}` in sibgle-page LaTeX documents, to be included in the main file via `\includegraphics`. Typically, `pdf` figure files generated in `plots/` get symlinked to `figures/`
 
 I like to use Inkscape to combine images, but `*.svg` files are ignored. Put
 the `*.svg` files into `share/` if you want to share them. 
