@@ -53,9 +53,9 @@ that someone needs to fix things manually with `git`.
 # What is the "Advisor-Student/s Mergeless" model?
 
 The model consists of the
-`master` branch used by the senior author and a branch for each co-author ('student'). The examples that follow
-use the branches `master` for the advisor and `barrymoo` for a student or postdoc co-author. The student is
-not supposed to commit to `master` and the advisor is not supposed to commit 
+branch `main` used by the senior author and a branch for each co-author ('student'). The examples that follow
+use the branches `main` for the advisor and `barrymoo` for a student or postdoc co-author. The student is
+not supposed to commit to `main` and the advisor is not supposed to commit 
 to the student branch. Neither the student nor the advisor will ever use an automated `git` merge. 
 
 `texcollab` makes a distinction between version-controlled files (primarily `tex` files) vs. other data that should not be under version control. `texcollab` provides commands to list version-controlled files that are different in the two branches, and an option to compare those files with the `meld` tool (or similar software) and merge the differences in `meld`. This way, there is always someone looking at the pieces that will get merged, and the aforementioned 'incomprehensible mess' is typically avoided. `meld` also has an option to merge all changes from a file in one branch to the same file
@@ -127,15 +127,15 @@ config" yields [Simplify Your Life With an SSH Config
 File](http://nerderati.com/2011/03/17/simplify-your-life-with-an-ssh-config-file/).
 The link should be enough to get you started.
 
-# How does tyhe student/postdoc use this model?
+# How does the student/postdoc use this model?
 
 It is easy. We assume that the repository is created by one of the co-authors
 of the manuscript (student).
 
 First, you need to set up some configuration variables inside `.texcollab` (see
-the one in this repo as an example). My group uses this tool for publications
-which means a public github really isn't a great idea. We have storage on a
-remote machine with `ssh` access, that domain is in `TEXCOLLAB_REMOTE_DOMAIN`
+the one in this repo as an example). We use this tool for publications
+which means a public github isn't a great idea, although a private repo with shared access may work. We have storage on a
+remote machine with `ssh` access. The domain is in `TEXCOLLAB_REMOTE_DOMAIN`
 (could be `example.somewhere.com`, or a shortcut in `.ssh/config`).  On the
 remote machine exists a directory where  "in-progress" publications are stored,
 something like `/$SOME_PATH/shared/latex/barrymoo/$PROJECT_NAME`, which is set
@@ -160,24 +160,31 @@ ensue :) Note, that `texcollab compile` exists and you should probably make
 sure it compiles properly before sending it to your advisor (they hate when it
 doesn't compile!). 
 
+*Note*: The `texcollab` script uses the git option `--initial-branch` to set the advisor
+branch to `main`. Per [this web page](https://stackoverflow.com/questions/42871542/how-can-i-create-a-git-repository-with-the-default-branch-name-other-than-maste), this is an option available in `git` as of version 2.28.0. If your system uses an older version of `git`, please modify the `texcollab` script
+to initialize the repo with the alternative commands provided on that web page, or replace 
+`main` with the default `master` and do not use the `--initial-branch` option.
+
 # How does the advisor use this model?
 
 This is also easy!
 
-Remember, first, that the advisor always uses the master branch. The
-student will send him/her the `.texcollab` file. The advisor will navigate to
-wherever they want the local copy and run `texcollab clone
+Remember, first, that the advisor always uses the `main` branch. The
+student will send him/her the `.texcollab` file. The advisor will first create an *empty*
+directory where they want to create the local copy and run `texcollab clone
 $TEXCOLLAB_REMOTE_DOMAIN:$TEXCOLLAB_REMOTE_DIR` (note lack of `.git` ending), replacing
-the variable names with the relevant strings from the .texcollab file.
+the variable names with the relevant strings from the .texcollab file. The clone
+command *must* be ran inside that new empty directory. 
 
 Once the clone is complete, the advisor moves the `.texcollab` file to the
-new local git repository (`cd` there) and modify `TEXCOLLAB_CURRENT_USER` to
+new local git repository and modify `TEXCOLLAB_CURRENT_USER` to
 `$TEXCOLLAB_ADVISOR`, and modify other environment settings as they choose. If there are
 'extras', run `texcollab extras pull`.
 
 Finally, the advisor needs to run `texcollab branch
-$TEXCOLLAB_STUDENT` (again, enter student manually) to make the student branch
-visible (git doesn't do this automatically), and compile the `tex` files. 
+$TEXCOLLAB_STUDENT` (again, replace the TEXCOLLAB_STUDENT variable with the student's username manually) to make the student branch
+visible (git doesn't do this automatically), then switch back to the main branch 
+with `texcollab branch main` and compile the `tex` files. 
 
 
 # Workflow

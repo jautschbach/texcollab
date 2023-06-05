@@ -149,7 +149,8 @@ function init(){
         errors+=('Error <init>: why are we in a git repository?')
         return 1
     else
-        git init
+        git init --initial-branch=main
+	git init -b main
     fi
 
     # Create our .gitignore
@@ -174,11 +175,11 @@ function init(){
     echo "*.DS_Store" >> .gitignore
     echo "*~" >> .gitignore
 
-    # Now we can add, commit, push to master
+    # Now we can add, commit, push to branch 'main'
     git remote add origin $TEXCOLLAB_REMOTE_DOMAIN:$TEXCOLLAB_REMOTE_DIR.git
     git add --all
     git commit -m "Initial Commit"
-    git push origin master
+    git push origin main
 
     # Make the student branch
     git checkout -b $TEXCOLLAB_STUDENT
@@ -200,14 +201,29 @@ function clone(){
     local test=$(echo "${array[0]}" | grep ":")
     if [ ! "$test" ]; then
         errors+=("Error <clone>: <repo> doesn't look like a domain")
-        errors+=("--> Did you forget 'rush:/somedir'?")
+        errors+=("--> Did you forget 'domain:/somedir'?")
+        return 1
+        exit
+    fi
+
+    if [ -d ".git" ]; then
+        errors+=('Error <clone>: we seem to be in an existing git repository?')
+        return 1
+    elif ls -A1q . | grep -q . ; then
+        errors+=('Error <clone>: current directory is not empty; please run in an empty directory')
         return 1
     else
-        git clone ${array[@]}
+
+        git clone ${array[@]} .
         # If this works, we'll print out the note
         if [ $? -eq 0 ]; then
-            errors+=("Note <clone>: the 'student' repo will need to be checked out manually!")
-            errors+=("--> source .texcollab; texcollab branch \$TEXCOLLAB_STUDENT") 
+            #errors+=("Note <clone>: the 'student' repo will need to be checked out manually!")
+            #errors+=("--> source .texcollab; texcollab branch \$TEXCOLLAB_STUDENT") 
+           git checkout main
+           errors+=("Note <clone>: We are working on the 'main' branch")
+           errors+=("1. you may ignore a prev. warning saying 'remote HEAD refers to nonexistent ref'")
+           errors+=("2. the student repo will need to be checked out manually!")
+           errors+=("3. also, now please create the .texcollab file here")
         fi
     fi
 }
@@ -249,7 +265,7 @@ function commit(){
         # You can't commit to another persons repo
         #  Obviously, people could mess with the configs, but I can't fix stupid
         local current_branch=$(git branch | sed -n '/\* /s///p')
-        if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "master" ]; then
+        if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "main" ]; then
             git add --all
             # eval gets around issue with quotes
             eval git commit -m \"${array[@]}\"
@@ -277,7 +293,7 @@ function push(){
         # You can't push to another persons repo
         #  Obviously, people could mess with the configs, but I can't fix stupid
         local current_branch=$(git branch | sed -n '/\* /s///p')
-        if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "master" ]; then
+        if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "main" ]; then
             git push origin $current_branch
         elif [ $current_branch == $TEXCOLLAB_STUDENT ]; then
             git push origin $current_branch
@@ -476,7 +492,7 @@ function compare(){
         # Strip path of '/' characters otherwise below will fail
         local file_name=$(echo ${array[0]} | sed 's/\// /' | awk '{print $NF}')
 
-        if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "master" ]; then
+        if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "main" ]; then
             git show ${array[1]}:${array[0]} > $$-texcollab-compare.tmp
             $TEXCOLLAB_MERGE_TOOL ${array[0]} $$-texcollab-compare.tmp
             rm $$-texcollab-compare.tmp
