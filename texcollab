@@ -578,7 +578,13 @@ function new(){
                 continue
             else
                 echo "===> Begin: $current_branch..$i <==="
-                git diff --name-status $current_branch..$i
+                local files=$(git diff --name-only $current_branch..$i)
+                #echo $files
+                for f in $files; do
+                 if ! git diff --quiet --ignore-space-change -G. $current_branch..$i -- $f; then
+                   git diff --name-status $current_branch..$i -- $f
+                 fi
+                done
                 echo "===>   End: $current_branch..$i <==="
             fi
         done
