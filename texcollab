@@ -116,6 +116,25 @@ function texcollab_source() {
             return 1
         fi
     done
+
+    # make sure we're on the correct branch. This becomes an issue when
+    # some of the texcollab commands are terminated before completing, which
+    # can leave the user tranded in a different branch.
+
+    local current_branch=$(git branch | sed -n '/\* /s///p')
+    
+    #echo "TEXCOLLAB_CURRENT_USER = $TEXCOLLAB_CURRENT_USER"
+    #echo "current_branch = $current_branch"
+
+    if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "main" ]; then
+       echo "working on main branch"
+    elif [ $current_branch == $TEXCOLLAB_STUDENT ] && [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_STUDENT ]; then
+       echo "working on branch $TEXCOLLAB_STUDENT"
+    else
+        errors+=("ERROR parsing .texcollab and your current git config !")
+	errors+=("Are you on the wrong branch? (check \& change with 'texcollab branch')")
+        return 1
+    fi
 }
 
 # function checks if first string in list is contained in remainder of list 
@@ -269,12 +288,12 @@ function commit(){
             git add --all
             # eval gets around issue with quotes
             eval git commit -m \"${array[@]}\"
-        elif [ $current_branch == $TEXCOLLAB_STUDENT ]; then
+        elif [ $current_branch == $TEXCOLLAB_STUDENT ] && [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_STUDENT ]; then
             git add --all
             # eval gets around issue with quotes
             eval git commit -m \"${array[@]}\"
         else
-            errors+=("Error <commit>: You are not allowed to commit here!")
+            errors+=("ERROR <commit>: You are not allowed to commit here!")
             return 1
         fi
     fi
@@ -295,10 +314,10 @@ function push(){
         local current_branch=$(git branch | sed -n '/\* /s///p')
         if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "main" ]; then
             git push origin $current_branch
-        elif [ $current_branch == $TEXCOLLAB_STUDENT ]; then
+        elif [ $current_branch == $TEXCOLLAB_STUDENT ] && [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_STUDENT ]; then
             git push origin $current_branch
         else
-            errors+=("Error <push>: You are not allowed to push there!")
+            errors+=("ERROR <push>: You are not allowed to push there!")
             return 1
         fi
     fi
@@ -496,12 +515,12 @@ function compare(){
             git show ${array[1]}:${array[0]} > $$-texcollab-compare.tmp
             $TEXCOLLAB_MERGE_TOOL ${array[0]} $$-texcollab-compare.tmp
             rm $$-texcollab-compare.tmp
-        elif [ $current_branch == $TEXCOLLAB_STUDENT ]; then
+        elif [ $current_branch == $TEXCOLLAB_STUDENT ] && [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_STUDENT ]; then
             git show ${array[1]}:${array[0]} > $$-texcollab-compare.tmp
             $TEXCOLLAB_MERGE_TOOL ${array[0]} $$-texcollab-compare.tmp
             rm $$-texcollab-compare.tmp
         else
-            errors+=("Error <compare>: You should be working in your branch!")
+            errors+=("ERROR <compare>: You should be working in your branch!")
             return 1
         fi
     fi
@@ -551,6 +570,8 @@ function status(){
         errors+=("Error <status>: Have you used status before?, try -h/--help")
         return 1
     fi
+    # Source Environment to make sure we're on the right branch
+    texcollab_source "<status>"
 }
 
 function save(){
