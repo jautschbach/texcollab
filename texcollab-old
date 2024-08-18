@@ -1,0 +1,650 @@
+#!/usr/bin/env bash
+
+# Currently supported commands, add string to usage as they become available
+supported_commands=("init" "clone" "branch" "add-collab" "commit" "push" "pull" "extras" "compile" "compare" "log" "view" "status" "save" "new" "push-all" "pull-all" "help" "usage") 
+function usage() {
+    echo "texcollab -- A latex collaboration engine using git"
+    echo "    written by: Barry Moore"
+    echo "    disclaimer: output from these commands is most likely from git itself!"
+    echo "                You may need to figure out how to solve your error with this tool."
+    echo "Usage:"
+    echo "    texcollab <command> [option]"
+    echo "Available Commands:"
+    echo "    help, usage                      -- show this screen"
+    echo "    init                             -- initialize a remote directory"
+    echo "    clone <repo> [name]              -- clone <repo>"
+    echo "    branch [branch]                  -- list branch or change to [branch]"
+    echo "    add-collab <branch>              -- create <branch> and change to <branch>"
+    echo "                                     --> use 'texcollab branch' for existing branches"   
+    echo "    status                           -- check status of files, does anything need to be committed?"
+    echo "    commit <message>                 -- add all, commit with <message>, and push to current branch"
+    echo "                                     --> .gitignore better be set properly"
+    echo "    push                             -- push to remote"
+    echo "    pull                             -- pull from remote"
+    echo "    extras <command>                 -- <push|pull> extras, includes figures, schemes, spreadsheets, data, and share"
+    echo "    push-all                         -- push to remote, includes extras"
+    echo "    pull-all                         -- pull from remote, includes extras"
+    echo "    compile                          -- compile the latex document"
+    echo "    compare <file> <branch/revision> -- compare <file> with <branch/revision>:<file>"
+    echo "    log [branch]                     -- view commit log of current branch, or [branch]"
+    echo "    view <file> <branch/revision>    -- view file <branch/revision>:<file>"
+    echo "    save <file> <branch/revision>    -- save file <branch/revision>:<file> as <branch>-<file>.tmp"
+    echo "    new                              -- show what's new"
+}
+
+# remote helper function
+function remote_texcollab_helper(){
+    local extras=("figures" "schemes" "spreadsheets" "data" "share")
+    if [ -d $1 ]; then
+        return 1
+    else
+        local tmp=($(echo $1 | sed 's/\// /g'))
+        if [ "${tmp[@]:(-1)}" == "extras" ]; then 
+            unset tmp[${#tmp[@]}-1]
+            local path=$(echo ${tmp[@]} | sed 's/ /\//g')
+            local group=$(groups | awk '{print $1}')
+            for i in ${extras[@]}; do
+                if [ ! -d /$path/$i ]; then
+                    mkdir /$path/$i
+                    setfacl -m g::rwx /$path/$i
+                    setfacl -m d:g:$group:rwx /$path/$i
+                fi
+            done
+        else
+            mkdir $1
+            cd $1
+            git init --bare --shared=group
+        fi
+        return 0
+    fi
+}
+
+# Another remote helper function
+function remote_extras_list(){
+    local extras=("figures" "schemes" "spreadsheets" "data" "share")
+    local actual_extras=()
+    for i in ${extras[@]}; do
+        if [ -d $1/$i ]; then
+            actual_extras+=("$i")
+        fi
+    done
+    echo ${actual_extras[@]}
+    return 1
+}
+
+# Function simply checks the command line for no arguments or -h/--help
+function check_command_line() {
+    if [ $# -eq 0 ]; then
+        return 1
+    elif [ $# -gt 0 ]; then
+        for i in $*; do
+            if [ "$i" == "-h" ] || [ "$i" == "--help" ]; then
+                return 1
+            fi
+        done 
+    else
+        return 0
+    fi
+}
+
+function texcollab_source() {
+    # Valid Configuration Variables
+    local configs=("TEXCOLLAB_REMOTE_DIR" "TEXCOLLAB_MERGE_TOOL" "TEXCOLLAB_REMOTE_DOMAIN" "TEXCOLLAB_ADVISOR" "TEXCOLLAB_STUDENT" "TEXCOLLAB_CURRENT_USER" "TEXCOLLAB_EDITOR")
+
+    # Try to generate the environment variables
+    if [ -f .texcollab ]; then
+        while read line; do
+            local array=($line)
+            if [ ${#array[@]} -ne 2 ]; then
+                errors+=('Error <.texcollab>: Issue with configuration file')
+                errors+=("--> Line: $line")
+                return 1
+            else
+                eval ${array[0]}=${array[1]}                
+            fi
+        done < .texcollab
+    else
+        errors+=("Error $1: cannot parse environment, see documentation")
+        return 1
+    fi
+
+    # Check the configuration environment
+    for i in ${configs[@]}; do
+        local result=$(eval echo "\$$i")
+        if [ "$result" == "" ]; then
+            errors+=("Error <.texcollab>: missing environment variable $i, please set or see documentation")
+            return 1
+        fi
+    done
+
+    # make sure we're on the correct branch. This becomes an issue when
+    # some of the texcollab commands are terminated before completing, which
+    # can leave the user tranded in a different branch.
+
+    local current_branch=$(git branch | sed -n '/\* /s///p')
+    
+    #echo "TEXCOLLAB_CURRENT_USER = $TEXCOLLAB_CURRENT_USER"
+    #echo "current_branch = $current_branch"
+
+    if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "master" ]; then
+       echo "working on advisor branch"
+    elif [ $current_branch == $TEXCOLLAB_STUDENT ] && [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_STUDENT ]; then
+       echo "working on branch $TEXCOLLAB_STUDENT"
+    else
+        errors+=("ERROR parsing .texcollab and your current git config !")
+	errors+=("Are you on the wrong branch? (check \& change with 'texcollab branch')")
+        return 1
+    fi
+}
+
+# function checks if first string in list is contained in remainder of list 
+function string_in_array() {
+    local array=($*)
+    for i in ${array[@]:1}; do
+        if [ "${array[0]}" == "$i" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+function init(){
+    # Source Environment
+    texcollab_source "<init>"
+    
+    # Check if the remote repository is already a git repository
+    #   User should set up ssh keys prior to this
+    #   typeset allows functions to be apparent to ssh connection
+    ssh $TEXCOLLAB_REMOTE_DOMAIN "$(typeset -f); remote_texcollab_helper $TEXCOLLAB_REMOTE_DIR.git" 2> /dev/null
+
+    # Check if remote_texcollab_helper worked
+    if [ ! $? -eq 0 ]; then
+        errors+=("Error <init>: issue with $TEXCOLLAB_REMOTE_DIR, does it already exist on $TEXCOLLAB_REMOTE_DOMAIN?")
+        return 1
+    fi
+    
+    # Check if we're in a git repository already, otherwise init
+    if [ -d ".git" ]; then
+        errors+=('Error <init>: why are we in a git repository?')
+        return 1
+    else
+        git init --initial-branch=master
+	#git init -b main
+    fi
+
+    # Create our .gitignore
+    echo ".texcollab" > .gitignore
+    echo "figures/" >> .gitignore
+    echo "schemes/" >> .gitignore
+    echo "spreadsheets/" >> .gitignore
+    echo "share/" >> .gitignore
+    echo "data/" >> .gitignore
+    echo "esub/" >> .gitignore
+    echo "*.zip" >> .gitignore
+    echo "*.dvi" >> .gitignore
+    echo "*.svg" >> .gitignore
+    echo "*.pdf" >> .gitignore
+    echo "*.eps" >> .gitignore
+    echo "*.aux" >> .gitignore
+    echo "*.bbl" >> .gitignore
+    echo "*.blg" >> .gitignore
+    echo "*.log" >> .gitignore
+    echo "*.tmp" >> .gitignore
+    echo "*.synctex.gz" >> .gitignore
+    echo "*.DS_Store" >> .gitignore
+    echo "*~" >> .gitignore
+
+    # Now we can add, commit, push to branch 'main'
+    git remote add origin $TEXCOLLAB_REMOTE_DOMAIN:$TEXCOLLAB_REMOTE_DIR.git
+    git add --all
+    git commit -m "Initial Commit"
+    git push origin master
+
+    # Make the student branch
+    git checkout -b $TEXCOLLAB_STUDENT
+    git add --all
+    git commit -m "Initial Commit"
+    git push origin $TEXCOLLAB_STUDENT
+}
+
+function clone(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ${#array[@]} -eq 0 ] || [ ${#array[@]} -gt 2 ]; then
+        errors+=("Error <clone>: Have you used clone before?, try -h/--help")
+        return 1
+    fi
+
+    # We do a dumb test to see if <repo> looks valid
+    #   git should be able to yield other errors
+    local test=$(echo "${array[0]}" | grep ":")
+    if [ ! "$test" ]; then
+        errors+=("Error <clone>: <repo> doesn't look like a domain")
+        errors+=("--> Did you forget 'domain:/somedir'?")
+        return 1
+        exit
+    fi
+
+    if [ -d ".git" ]; then
+        errors+=('Error <clone>: we seem to be in an existing git repository?')
+        return 1
+    elif ls -A1q . | grep -q . ; then
+        errors+=('Error <clone>: current directory is not empty; please run in an empty directory')
+        return 1
+    else
+
+        git clone ${array[@]} .
+        # If this works, we'll print out the note
+        if [ $? -eq 0 ]; then
+            #errors+=("Note <clone>: the 'student' repo will need to be checked out manually!")
+            #errors+=("--> source .texcollab; texcollab branch \$TEXCOLLAB_STUDENT") 
+           git checkout master
+           errors+=("Note <clone>: We are working on the 'master' branch")
+           errors+=("1. you may ignore a prev. warning saying 'remote HEAD refers to nonexistent ref'")
+           errors+=("2. the student repo will need to be checked out manually!")
+           errors+=("3. also, now please create the .texcollab file here")
+        fi
+    fi
+}
+
+function branch(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ${#array[@]} -gt 1 ]; then
+        errors+=("Error <branch>: Have you used branch before?, try -h/--help")
+        return 1
+    elif [ ${#array[@]} -eq 1 ]; then
+        git checkout ${array[@]}
+    else
+        git branch
+    fi
+}
+
+function add-collab(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ${#array[@]} -ne 1 ]; then
+        errors+=("Error <add-collab>: Have you used add-collab before?, try -h/--help")
+        return 1
+    else
+        git checkout -b ${array[@]}
+    fi
+}
+
+function commit(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ! ${#array[@]} -ge 1 ]; then
+        errors+=("Error <commit>: Have you used commit before?, try -h/--help")
+        return 1
+    else
+        # Source Environment
+        texcollab_source "<commit>"
+
+        # You can't commit to another persons repo
+        #  Obviously, people could mess with the configs, but I can't fix stupid
+        local current_branch=$(git branch | sed -n '/\* /s///p')
+        if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "master" ]; then
+            git add --all
+            # eval gets around issue with quotes
+            eval git commit -m \"${array[@]}\"
+        elif [ $current_branch == $TEXCOLLAB_STUDENT ] && [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_STUDENT ]; then
+            git add --all
+            # eval gets around issue with quotes
+            eval git commit -m \"${array[@]}\"
+        else
+            errors+=("ERROR <commit>: You are not allowed to commit here!")
+            return 1
+        fi
+    fi
+}
+
+function push(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ! ${#array[@]} -eq 0 ]; then
+        errors+=("Error <push>: Have you used push before?, try -h/--help")
+        return 1
+    else
+        # Source Environment
+        texcollab_source "<push>"
+
+        # You can't push to another persons repo
+        #  Obviously, people could mess with the configs, but I can't fix stupid
+        local current_branch=$(git branch | sed -n '/\* /s///p')
+        if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "master" ]; then
+            git push origin $current_branch
+        elif [ $current_branch == $TEXCOLLAB_STUDENT ]; then
+            git push origin $current_branch
+        else
+            errors+=("Error <push>: You are not allowed to push there!")
+            return 1
+        fi
+    fi
+}
+
+function pull(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ! ${#array[@]} -eq 0 ]; then
+        errors+=("Error <pull>: Have you used pull before?, try -h/--help")
+        return 1
+    else
+        # Normal Pull Functionality
+        local current_branch=$(git branch | sed -n '/\* /s///p')
+        local branches=($(git branch | sed 's/\*//'))
+        for i in ${branches[@]}; do
+            git checkout $i
+            git pull origin $i
+        done
+        git checkout $current_branch
+
+        # Check for new files which don't exist in current branch
+        for i in ${branches[@]}; do
+            if [ "$i" == "$current_branch" ]; then
+                continue
+            else
+                local new_files=($(git diff --diff-filter=A --name-only $current_branch..$i))
+
+                # Use these for later
+                local file_name=0
+                local file_path=0
+
+                for j in ${new_files[@]}; do
+                    file_name=(${j//\// })
+                    read -p "Add new file '$j' from branch '$i' (y,N)? " choice
+                    case "$choice" in
+                        y|Y )
+                            if [ ${#file_name[@]} -gt 1 ]; then
+                                file_path=${j%/*}
+                                file_name=${j##*/}
+                                if [ ! -d "$file_path" ]; then
+                                    mkdir $file_path
+                                fi
+                                git show $i:$j > $j
+                            else
+                                git show $i:$j > $j
+                            fi
+                            echo "Copied new file '$j' from branch '$i'"
+                            ;;
+                        n|N|* )
+                            echo "Ignoring new file '$j' from branch '$i'"
+                            ;;
+                        esac
+                done
+            fi
+        done
+    fi
+}
+
+function extras(){
+    # Need our environment
+    texcollab_source "<extras>"
+    local extras=("figures" "schemes" "spreadsheets" "data" "share")
+
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ! ${#array[@]} -eq 1 ]; then
+        errors+=("Error <extras>: Have you used extras before?, try -h/--help")
+        return 1
+    elif [ ! ${array[0]} == "push" ] && [ ! ${array[0]} == "pull" ]; then
+        errors+=("Error <extras>: valid commands to <extras> include 'push' and 'pull', try -h/--help")
+        return 1
+    else
+# jochen: https://www.linuxquestions.org/questions/programming-9/rsync-cannot-delete-non-empty-directory-4175597350/
+# it may be necessary to add --delete-excluded after --delete to avoid
+# cannot delete non-empty directory: errors.
+# However, that causes all backup files to be deleted ... 
+# 161220: I previously added the backup option --backup --suffix=.bak
+# but it created a mess of .bak files so I removed it again
+        local base_rsync_options="-vrzP -e ssh --delete --checksum --links --safe-links"
+        if [ ${array[0]} == "push" ]; then
+            # First push will need this command, "/extras" just gets us to the correct `else if` statement in remote_texcollab_helper
+            ssh $TEXCOLLAB_REMOTE_DOMAIN "$(typeset -f); remote_texcollab_helper $TEXCOLLAB_REMOTE_DIR.git/extras" 2> /dev/null
+
+            # Push, build up an actual extras array
+            local actual_extras=$(remote_extras_list .)
+            local rsync_files_remote_domain="${actual_extras[@]} $TEXCOLLAB_REMOTE_DOMAIN:$TEXCOLLAB_REMOTE_DIR.git/"
+
+            if [ ${#actual_extras[@]} -ne 0 ]; then
+                # Some undocumented features, will get skipped if using standard version
+                if [ -n "$TEXCOLLAB_REMOTE_RSYNC" -a -n "$TEXCOLLAB_GROUP" ]; then
+                    echo "running rsync $base_rsync_options --rsync-path=$TEXCOLLAB_REMOTE_RSYNC --group --chown=:$TEXCOLLAB_GROUP --perms --chmod=g+rw $rsync_files_remote_domain"
+                    rsync $base_rsync_options --rsync-path=$TEXCOLLAB_REMOTE_RSYNC --group --chown=:$TEXCOLLAB_GROUP --perms --chmod=g+rw $rsync_files_remote_domain
+                elif [ -n "$TEXCOLLAB_REMOTE_RSYNC" ]; then
+                    echo "running rsync $base_rsync_options --rsync-path=$TEXCOLLAB_REMOTE_RSYNC $rsync_files_remote_domain"
+                    rsync $base_rsync_options --rsync-path=$TEXCOLLAB_REMOTE_RSYNC $rsync_files_remote_domain
+                elif [ -n "$TEXCOLLAB_GROUP" ]; then
+                    echo "running rsync $base_rsync_options --group --chown=:$TEXCOLLAB_GROUP --perms --chmod=g+rw  $rsync_files_remote_domain"
+                    rsync $base_rsync_options --group --chown=:$TEXCOLLAB_GROUP --perms --chmod=g+rw  $rsync_files_remote_domain
+                else
+                    rsync $base_rsync_options $rsync_files_remote_domain
+                fi
+            fi
+        else
+            # Pull, build up an actual extras array
+            local actual_extras=$(ssh $TEXCOLLAB_REMOTE_DOMAIN "$(typeset -f); remote_extras_list $TEXCOLLAB_REMOTE_DIR.git")
+            if [ ${#actual_extras[@]} -ne 0 ]; then
+                echo eval "running rsync $base_rsync_options $TEXCOLLAB_REMOTE_DOMAIN:$TEXCOLLAB_REMOTE_DIR.git/{$(echo ${actual_extras[@]} | sed 's/ /,/g')} ."
+                eval "rsync $base_rsync_options $TEXCOLLAB_REMOTE_DOMAIN:$TEXCOLLAB_REMOTE_DIR.git/{$(echo ${actual_extras[@]} | sed 's/ /,/g')} ."
+            fi
+        fi
+    fi
+}
+
+function push-all(){
+    push
+    extras push
+}
+
+function pull-all(){
+    pull
+    extras pull
+}
+
+function compile(){
+    clean() {
+        rm *.{bbl,aux,blg}
+    }
+
+    check_latex_return_status() {
+        if [ $? != 0 ]; then      
+            echo "Latex failed!"  
+            exit
+        fi                        
+    }                             
+
+    run_latex() {                    
+        latex -halt-on-error $1       
+        check_latex_return_status     
+        bibtex $1                     
+        bibtex $1                     
+        latex -halt-on-error $1       
+        check_latex_return_status     
+        latex -halt-on-error $1       
+        check_latex_return_status     
+        bibtex $1                     
+        pdflatex -halt-on-error $1       
+        check_latex_return_status     
+    }                                 
+
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ! ${#array[@]} -eq 0 ]; then
+        errors+=("Error <compile>: Have you used compile before?, try -h/--help")
+        return 1
+    else
+        local tex=($(ls *.tex | sed 's/\.tex//g'))
+        string_in_array supporting-information ${tex[@]}
+        if [ $? -eq 0 ]; then
+            # Assume linked supporting information
+            tex=("${tex[@]/supporting-information}")
+            run_latex supporting-information
+            for i in ${tex[@]}; do
+                run_latex $i
+            done
+            run_latex supporting-information
+        else
+            # Compile tex files, assumed unlinked
+            clean
+            for i in ${tex[@]}; do
+                run_latex $i
+            done
+        fi
+    fi
+}
+
+function compare(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ! ${#array[@]} -eq 2 ]; then
+        errors+=("Error <compare>: Have you used compare before?, try -h/--help")
+        return 1
+    else
+        # Source Environment
+        texcollab_source "<compare>"
+
+        # You shouldn't be allowed to compare things if they aren't yours
+        #  Obviously, people could mess with the configs, but I can't fix stupid
+        local current_branch=$(git branch | sed -n '/\* /s///p')
+
+        # Strip path of '/' characters otherwise below will fail
+        local file_name=$(echo ${array[0]} | sed 's/\// /' | awk '{print $NF}')
+
+        if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "master" ]; then
+            git show ${array[1]}:${array[0]} > $$-texcollab-compare.tmp
+            $TEXCOLLAB_MERGE_TOOL ${array[0]} $$-texcollab-compare.tmp
+            rm $$-texcollab-compare.tmp
+        elif [ $current_branch == $TEXCOLLAB_STUDENT ]; then
+            git show ${array[1]}:${array[0]} > $$-texcollab-compare.tmp
+            $TEXCOLLAB_MERGE_TOOL ${array[0]} $$-texcollab-compare.tmp
+            rm $$-texcollab-compare.tmp
+        else
+            errors+=("Error <compare>: You should be working in your branch!")
+            return 1
+        fi
+    fi
+}
+
+function view(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ! ${#array[@]} -eq 2 ]; then
+        errors+=("Error <view>: Have you used compare before?, try -h/--help")
+        return 1
+    else
+        # Source Environment
+        texcollab_source "<view>"
+
+        # Strip path of '/' characters otherwise below will fail
+        local file_name=$(echo ${array[0]} | sed 's/\// /' | awk '{print $NF}')
+
+        # We can let people <view> whatever they please, we'll append the
+        #   file extension twice to ensure we have syntax highlighting
+        #   in the temporary file
+        git show ${array[1]}:${array[0]} > ${array[1]}-$file_name.${array[0]##*.}
+        $TEXCOLLAB_EDITOR ${array[1]}-$file_name.${array[0]##*.}
+        rm ${array[1]}-$file_name.${array[0]##*.}
+    fi
+}
+
+function log(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ${#array[@]} -eq 0 ]; then
+        git log
+    elif [ ${#array[@]} -eq 1 ]; then
+        git log ${array[0]}
+    else
+        errors+=("Error <log>: Have you used log before?, try -h/--help")
+        return 1
+    fi
+}
+
+function status(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ${#array[@]} -eq 0 ]; then
+        git status
+    else
+        errors+=("Error <status>: Have you used status before?, try -h/--help")
+        return 1
+    fi
+    # Source Environment to make sure we're on the right branch
+    texcollab_source "<status>"
+}
+
+function save(){
+    local array=($*)
+    # Check command options, git will fail if they provide improper command
+    if [ ! ${#array[@]} -eq 2 ]; then
+        errors+=("Error <save>: Have you used save before?, try -h/--help")
+        return 1
+    else
+        # Strip path of '/' characters otherwise below will fail
+        local file_name=$(echo ${array[0]} | sed 's/\// /' | awk '{print $NF}')
+
+        git show ${array[1]}:${array[0]} > ${array[1]}-$file_name.tmp
+    fi
+}
+
+function new(){
+    local array=($*)
+    local current_branch=$(git branch | sed -n '/\* /s///p')
+    local branches=($(git branch | sed 's/\*//'))
+    # Check command options, git will fail if they provide improper command
+    if [ ${#array[@]} -eq 0 ]; then
+        for i in ${branches[@]}; do
+            if [ "$i" == "$current_branch" ]; then
+                continue
+            else
+                echo "===> Begin: $current_branch..$i <==="
+                # original command: git diff --name-status $current_branch..$i
+                # new version JA 2024/04/29:
+                local files=$(git diff --name-only $current_branch..$i)
+                #echo $files
+                for f in $files; do
+                 if ! git diff --quiet --ignore-space-change -G. $current_branch..$i -- $f; then
+                   git diff --name-status $current_branch..$i -- $f
+                 fi
+                done
+                # end new version
+                echo "===>   End: $current_branch..$i <==="
+            fi
+        done
+    else
+        errors+=("Error <new>: Have you used status before?, try -h/--help")
+        return 1
+    fi
+}
+
+function help(){
+    usage
+}
+
+# Turn command line options into useful arrays
+#   We also define an errors array to capture warnings and errors
+arguments=($*)
+command=${arguments[0]}
+options=${arguments[@]:1}
+errors=()
+
+# Check for no command line options, or -h/--help
+if ! $(check_command_line ${arguments[@]}); then
+    usage
+    exit 1
+fi
+
+# Check if user selected a valid command
+if ! $(string_in_array ${command[@]} ${supported_commands[@]}); then
+    echo "Error: Invalid Command. Try -h/--help"
+    exit 1
+fi
+
+# Run the command with the options, corresponding function deals with errors.
+${command[@]} ${options[@]}
+
+# Print out any errors which may have occured in our functions
+if [ ${#errors[@]} -gt 0 ]; then
+    for i in "${errors[@]}"; do echo $i; done
+fi
