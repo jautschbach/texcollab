@@ -17,24 +17,29 @@ function _texcollab(){
     fi
 
 	case "${prev}" in
-        texcollab)
-			COMPREPLY=($(compgen -W "${opts}" -- ${cur}))
-			return 0
-			;;
-		branch)
-			local branches=$(git branch | sed 's/\*//')
-			COMPREPLY=($(compgen -W "${branches}" -- ${cur}))
-			return 0
-			;;
-        extras)
-            local commands="push pull"
-            COMPREPLY=($(compgen -W "${commands}" -- ${cur}))
-            return 0
-            ;;
-		*)
-            COMPREPLY=($(compgen -W "$(git ls-files)" -- ${cur}))
-			return 0
-			;;
+            texcollab)
+		COMPREPLY=($(compgen -W "${opts}" -- ${cur}))
+		return 0
+		;;
+	    branch)
+		local branches=$(git branch | sed 's/\*//')
+		COMPREPLY=($(compgen -W "${branches}" -- ${cur}))
+		return 0
+		;;
+	    compare)
+		local branches=$(git branch | sed 's/\*//')
+		COMPREPLY=($(compgen -W "${branches}" -- ${cur}))
+		return 0
+		;;
+            extras)
+		local commands="push pull"
+		COMPREPLY=($(compgen -W "${commands}" -- ${cur}))
+		return 0
+		;;
+	    *)
+		COMPREPLY=($(compgen -W "$(git ls-files)" -- ${cur}))
+		return 0
+		;;
 	esac
 }
 complete -F _texcollab texcollab

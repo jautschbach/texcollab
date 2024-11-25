@@ -193,7 +193,7 @@ Again, this is easy.
 
 Both the student and advisor can make changes in their branches as they see fit, `commit`, `push`,
 `pull`, `extras push/pull`, etc. When the advisor, or student, are ready to
-merge changes, they run `texcollab compare main.tex <other branch>` ( compares `main.tex` of
+merge changes, they run `texcollab compare <other branch> main.tex` ( compares `main.tex` of
 the branch you are working on with `main.tex` in the other branch  (student branch `barrymoo`, for example). This will open up the
 `TEXCOLLAB_MERGE_TOOL` (`meld` or alternatives) and
 then one can pick and choose the changes. Finally, `commit` and then `push`
@@ -260,6 +260,7 @@ This is a work in progress, but our group is publishing in a variety of scientif
    prevents you from committing, potentially huge, files you did not intend to. 
    Such files should either be listed in `.gitignore` or stored in one of the `extras`
    directories. 
+3. Autocompletion is available for some of the commands, e.g., after `texcollab compare` autocompletion is offered for the branch names in the repository. To enable this functionality, source the file `texcollab-autocomplete.sh` from this repository in your `.bashrc`. 
 
 # Advanced Settings for `.texcollab`
 

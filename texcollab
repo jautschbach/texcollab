@@ -25,10 +25,10 @@ function usage() {
     echo "    push-all                         -- push to remote, includes extras"
     echo "    pull-all                         -- pull from remote, includes extras"
     echo "    compile                          -- compile the latex document"
-    echo "    compare <file> <branch/revision> -- compare <file> with <branch/revision>:<file>"
+    echo "    compare <branch/revision> <file> -- compare <file> with <branch/revision>:<file>"
     echo "    log [branch]                     -- view commit log of current branch, or [branch]"
-    echo "    view <file> <branch/revision>    -- view file <branch/revision>:<file>"
-    echo "    save <file> <branch/revision>    -- save file <branch/revision>:<file> as <branch>-<file>.tmp"
+    echo "    view <branch/revision>  <file>   -- view file <branch/revision>:<file>"
+    echo "    save <branch/revision>  <file>   -- save file <branch/revision>:<file> as <branch>-<file>.tmp"
     echo "    new                              -- show what's new"
 }
 
@@ -511,13 +511,15 @@ function compare(){
         # Strip path of '/' characters otherwise below will fail
         local file_name=$(echo ${array[0]} | sed 's/\// /' | awk '{print $NF}')
 
+	# jochen 2024-11-25: swapped array[0] and array[1] in the
+	# commands below so the file name comes last
         if [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_ADVISOR ] && [ $current_branch == "main" ]; then
-            git show ${array[1]}:${array[0]} > $$-texcollab-compare.tmp
-            $TEXCOLLAB_MERGE_TOOL ${array[0]} $$-texcollab-compare.tmp
+            git show ${array[0]}:${array[1]} > $$-texcollab-compare.tmp
+            $TEXCOLLAB_MERGE_TOOL ${array[1]} $$-texcollab-compare.tmp
             rm $$-texcollab-compare.tmp
         elif [ $current_branch == $TEXCOLLAB_STUDENT ] && [ $TEXCOLLAB_CURRENT_USER == $TEXCOLLAB_STUDENT ]; then
-            git show ${array[1]}:${array[0]} > $$-texcollab-compare.tmp
-            $TEXCOLLAB_MERGE_TOOL ${array[0]} $$-texcollab-compare.tmp
+            git show ${array[0]}:${array[1]} > $$-texcollab-compare.tmp
+            $TEXCOLLAB_MERGE_TOOL ${array[1]} $$-texcollab-compare.tmp
             rm $$-texcollab-compare.tmp
         else
             errors+=("ERROR <compare>: You should be working in your branch!")
@@ -530,21 +532,24 @@ function view(){
     local array=($*)
     # Check command options, git will fail if they provide improper command
     if [ ! ${#array[@]} -eq 2 ]; then
-        errors+=("Error <view>: Have you used compare before?, try -h/--help")
+        errors+=("Error <view>: Have you used view before?, try -h/--help")
         return 1
     else
+	# jochen 2024-11-25: swapped the '1'and '0' array arguments below
         # Source Environment
         texcollab_source "<view>"
 
         # Strip path of '/' characters otherwise below will fail
-        local file_name=$(echo ${array[0]} | sed 's/\// /' | awk '{print $NF}')
+        local file_name=$(echo ${array[1]} | sed 's/\// /' | awk '{print $NF}')
 
         # We can let people <view> whatever they please, we'll append the
         #   file extension twice to ensure we have syntax highlighting
         #   in the temporary file
-        git show ${array[1]}:${array[0]} > ${array[1]}-$file_name.${array[0]##*.}
-        $TEXCOLLAB_EDITOR ${array[1]}-$file_name.${array[0]##*.}
-        rm ${array[1]}-$file_name.${array[0]##*.}
+	# jochen 2024-11-25: removed .${array[0]##*.} at end of lines 1,2,3
+	# below (after swapping arguments 0 and 1
+        git show ${array[0]}:${array[1]} > ${array[0]}-$file_name
+        $TEXCOLLAB_EDITOR ${array[0]}-$file_name
+        rm ${array[0]}-$file_name
     fi
 }
 
@@ -582,9 +587,10 @@ function save(){
         return 1
     else
         # Strip path of '/' characters otherwise below will fail
-        local file_name=$(echo ${array[0]} | sed 's/\// /' | awk '{print $NF}')
+        local file_name=$(echo ${array[1]} | sed 's/\// /' | awk '{print $NF}')
 
-        git show ${array[1]}:${array[0]} > ${array[1]}-$file_name.tmp
+	# jochen 2024-11-25: swapped the '1'and '0' array arguments below
+        git show ${array[0]}:${array[1]} > ${array[0]}-$file_name.tmp
     fi
 }
 
