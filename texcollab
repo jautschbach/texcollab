@@ -189,6 +189,9 @@ function init(){
     echo "*.bbl" >> .gitignore
     echo "*.blg" >> .gitignore
     echo "*.log" >> .gitignore
+    echo "*.lof" >> .gitignore
+    echo "*.lot" >> .gitignore
+    echo "*.fls" >> .gitignore
     echo "*.tmp" >> .gitignore
     echo "auto/" >> .gitignore
     echo "*.synctex.gz" >> .gitignore
@@ -426,7 +429,7 @@ function extras(){
             # Pull, build up an actual extras array
             local actual_extras=$(ssh $TEXCOLLAB_REMOTE_DOMAIN "$(typeset -f); remote_extras_list $TEXCOLLAB_REMOTE_DIR.git")
             if [ ${#actual_extras[@]} -ne 0 ]; then
-                echo eval "running rsync $base_rsync_options $TEXCOLLAB_REMOTE_DOMAIN:$TEXCOLLAB_REMOTE_DIR.git/{$(echo ${actual_extras[@]} | sed 's/ /,/g')} ."
+                echo "running" eval "rsync $base_rsync_options $TEXCOLLAB_REMOTE_DOMAIN:$TEXCOLLAB_REMOTE_DIR.git/{$(echo ${actual_extras[@]} | sed 's/ /,/g')} ."
                 eval "rsync $base_rsync_options $TEXCOLLAB_REMOTE_DOMAIN:$TEXCOLLAB_REMOTE_DIR.git/{$(echo ${actual_extras[@]} | sed 's/ /,/g')} ."
             fi
         fi
